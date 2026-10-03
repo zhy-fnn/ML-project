@@ -37,63 +37,54 @@ MathJax = {
 </head><body>
 <div class="bar">技术博客.md · 全文渲染预览 · 公式由 MathJax 渲染（首次打开需联网等 2~5 秒）</div>
 <div class="wrap">
-<div class="errbox">如果刚双击打开看到的是纯文本公式：<b>等 2~5 秒</b>，MathJax 会自己排版。若一直不变，说明没联网。</div>
 <h1>技博：连芙宁娜都能看懂的线性回归</h1>
-<blockquote>
-<p>本文将以求导为主线，用numpy串联起一元线性回归到多元线性回归的梯度下降原理，并分析为何直接差分法这样直白的方法会败给pytorch的autograd，以此对机器学习的基本方法进行数学理论的误差分析。</p>
-</blockquote>
+<blockquote><p>本文将以求导为主线，用numpy串联起一元线性回归到多元线性回归的梯度下降原理，并分析为何直接差分法这样直白的方法会败给pytorch的autograd，以此对机器学习的基本方法进行数学理论的误差分析。</p></blockquote>
 <h2>一元到多元的实现与变体</h2>
 <p>简单来说，机器学习主要分为六个流程：<strong>①数据集获取②分块出训练集与测试集③构建预测模型④选择损失函数⑤梯度下降并训练⑥训练模型与测试集对拍</strong>。在本章我将讲述作为大一新生在处理这六个流程上遇到的问题和解决思路。</p>
 <p><strong>①数据集获取</strong></p>
-<pre><code class="language-python">import numpy as np
+<pre><code>import numpy as np
 np.random.seed(0)
 x=np.random.uniform(0,100,numbers)
 w_r=np.random.randint(0,5)
 b_r=np.random.randint(0,5)
 bios=np.random.randn(numbers)*0.5
-y=x*w_r+b_r+bios
-</code></pre>
+y=x*w_r+b_r+bios</code></pre>
 <p>为了保证数据的稳定，我每次就用同一个np的种子生成数据，其中numbers是你所要的数据量，在此为了衡量不同数据量时的泛化能力我取的是10,20,50,100,1000,10000,50000,100000。在这里，我一开始的bios是用uniform生成(0,1e-2)的浮点数，但如果这样就意味着y上移了5e-3，会导致理论上b一定无法和b_r相等，并且数据过大导致震荡，训练不稳定。</p>
 <p><strong>②分块出训练集与测试集</strong></p>
 <p>因为一元线性回归的数据集都是自己生成的，所以我们就按照上述代码在重新生成一遍</p>
-<pre><code class="language-python">xte=np.random.uniform(0,100,100)
-</code></pre>
+<pre><code>xte=np.random.uniform(0,100,100)</code></pre>
 <p><strong>③构建预测模型</strong></p>
 <p>作为一元线性回归，它的模型显然是</p>
-<pre><code class="language-python">def predict(w,x_s,b):
-    return w_s*x_s+b#这里把w写在左侧是一个好习惯，在多元线性回归时有用
-</code></pre>
+<pre><code>def predict(w,x_s,b):
+    return w_s*x_s+b#这里把w写在左侧是一个好习惯，在多元线性回归时有用</code></pre>
 <p><strong>④构建损失函数</strong></p>
-<p>损失函数就是用来衡量模型与真实值的差值的，绝大多数人第一时间想到的肯定就是直接<strong>预测值-真实值,然后求平均</strong>但是这样会导致最后，预测值是<strong>w×x_hat+b</strong>,真实值是<strong>w_r×x_hat+b_r+bios</strong>，最后发现
-预测值与真实值的差距就仅仅是平均值的差距，而平均值一是易受极端数据影响二是不能反映单个数据之间的差距，所以我们在此就要构建一个能同时用到每一个x的损失函数。
-我们的第一想法就是绝对值函数，实现形式是这样的：</p>
-<pre><code class="language-python">def lossc(w,x_s,b,y):
-    return (1/numbers)*abs(predict(w,x_s,b)-y).sum()
-</code></pre>
-<p>固然绝对值函数简单易懂，但它的问题一是函数导数在拐点处<strong>不可导</strong>，因此对于拐点要单独讨论；二是它的导数是<strong>常数</strong>，因此每次梯度下降的步长相同，难收敛。
-那有没有一种函数能即排除负号，还能用到每一个x呢？有的兄弟，有的。</p>
+<p>损失函数就是用来衡量模型与真实值的差值的，绝大多数人第一时间想到的肯定就是直接<strong>预测值-真实值,然后求平均</strong>但是这样会导致最后，预测值是<strong>w×x_hat+b</strong>,真实值是<strong>w_r×x_hat+b_r+bios</strong>，最后发现</p>
+<p>预测值与真实值的差距就仅仅是平均值的差距，而平均值一是易受极端数据影响二是不能反映单个数据之间的差距，所以我们在此就要构建一个能同时用到每一个x的损失函数。</p>
+<p>我们的第一想法就是绝对值函数，实现形式是这样的：</p>
+<pre><code>def lossc(w,x_s,b,y):
+    return (1/numbers)*abs(predict(w,x_s,b)-y).sum()</code></pre>
+<p>固然绝对值函数简单易懂，但它的问题一是函数导数在拐点处<strong>不可导</strong>，因此对于拐点要单独讨论；二是它的导数是<strong>常数</strong>，因此每次梯度下降的步长相同，难收敛。</p>
+<p>那有没有一种函数能即排除负号，还能用到每一个x呢？有的兄弟，有的。</p>
 <p>人们想出了<strong>最小二乘法（MSE）</strong>，也是机器学习最常用的损失函数之一，它的实现是这样的：</p>
-<pre><code class="language-python">def loss(w,x_s,b,y):
-    return (1/numbers)*((predict(w,x_s,b)-y)**2).sum()
-</code></pre>
-<p>这样在求导后，根据链式法则，w的导数就带有一个**$\hat y$-y**，能让导数随着接近真实值而改变，差别大步子大，差别小步子小，自适应下降。
-在之后求导的比较中，我们将用数据来说明这二者的差异。</p>
+<pre><code>def loss(w,x_s,b,y):
+    return (1/numbers)*((predict(w,x_s,b)-y)**2).sum()</code></pre>
+<p>这样在求导后，根据链式法则，w的导数就带有一个<strong>$\hat y$-y</strong>，能让导数随着接近真实值而改变，差别大步子大，差别小步子小，自适应下降。</p>
+<p>在之后求导的比较中，我们将用数据来说明这二者的差异。</p>
 <p><strong>⑤梯度下降并训练</strong></p>
-<p>这二者我就放在一起说了，我们先用公式推导出一元线性回归的导数公式，本质上是<strong>损失函数（模型-真实值）</strong>，因此要用到链式法则
-我们令 $\hat y=\mathrm{predict}(w,x_s,b)$，那么根据链式法则，损失函数对 $w$ 的偏导就是 $\dfrac{\partial J}{\partial \hat y}\cdot\dfrac{\partial \hat y}{\partial w}$，再分别分析：</p>
+<p>这二者我就放在一起说了，我们先用公式推导出一元线性回归的导数公式，本质上是<strong>损失函数（模型-真实值）</strong>，因此要用到链式法则</p>
+<p>我们令 $\hat y=\mathrm{predict}(w,x_s,b)$，那么根据链式法则，损失函数对 $w$ 的偏导就是 $\dfrac{\partial J}{\partial \hat y}\cdot\dfrac{\partial \hat y}{\partial w}$，再分别分析：</p>
 <p>$$\frac{\partial J}{\partial \hat y}=\frac{2}{n}\left(\hat y-y\right),\qquad \frac{\partial \hat y}{\partial w}=x_s$$</p>
 <p>因此</p>
 <p>$$\frac{\partial J}{\partial w}=\frac{2}{n}\left(\hat y-y\right)x_s$$</p>
-<p>同理 $b$ 也能这样通过链式法则求出。
-在py里面的实现形式是这样的</p>
-<pre><code class="language-python">def grads(w,x_s,b,y):
+<p>同理 $b$ 也能这样通过链式法则求出。</p>
+<p>在py里面的实现形式是这样的</p>
+<pre><code>def grads(w,x_s,b,y):
     y_hat=predict(w,x_s,b)
     dw=(2/numbers)*((y_hat-y)*x_s).sum()
     db=(2/numbers)*(y_hat-y).sum()
-    return dw,db
-</code></pre>
-<p>这里dw，db就组成了loss函数的梯度，而梯度就是在一个函数中变化最大的方向向量，它指向使函数增加的方向，因此为了让模型最快收敛，我们要每次**$w\leftarrow w-dw$，$b\leftarrow b-db$**，又因为如果直接相减会导致步长过大无法收敛，我们要在每次跨步时乘一个学习率（learning rate），在py中的实现是这样的：</p>
-<pre><code class="language-python">lr=0.05
+    return dw,db</code></pre>
+<p>这里dw，db就组成了loss函数的梯度，而梯度就是在一个函数中变化最大的方向向量，它指向使函数增加的方向，因此为了让模型最快收敛，我们要每次<strong>$w\leftarrow w-dw$，$b\leftarrow b-db$</strong>，又因为如果直接相减会导致步长过大无法收敛，我们要在每次跨步时乘一个学习率（learning rate），在py中的实现是这样的：</p>
+<pre><code>lr=0.05
 w=0
 b=0
 times=None
@@ -105,119 +96,122 @@ for i in range(1000):
     losses.append(l)
     if np.linalg.norm([dw,db])&lt;1e-6:#收敛了就停止
         times=i
-        break
-</code></pre>
+        break</code></pre>
+<p>训练完之后，把每一步记下来的 <code>losses</code> 画出来，就得到了 loss 的下降曲线：</p>
+<pre><code>plt.figure(figsize=(7, 4))
+plt.plot(losses, color="#0284c7", lw=1.6, label="GD loss")
+plt.axhline(floor, ls="--", c="#94a3b8", lw=1, label=f"闭式解底线 {floor:.6f}")
+plt.axvline(times, ls=":", c="#f97316", lw=1, label=f"收敛 {times} 步")
+plt.yscale("log")
+plt.xlabel("迭代步数"); plt.ylabel("loss (MSE)")
+plt.grid(alpha=.3, which="both"); plt.legend()
+plt.savefig("loss_curve.png", dpi=120)
+plt.show()</code></pre>
+<p>这里的 <code>floor</code> 是最小二乘的<strong>闭式解</strong>：把 $X$ 补一列 $1$ 拼成 $X=[x_s,\ \mathbf{1}]$，直接解 $\theta=(X^{\top}X)^{-1}X^{\top}y$，得到的残差就是这批数据能达到的 loss 下限。</p>
+<p><img alt="一元线性回归 · loss 下降曲线" src="loss_curve.png"></p>
+<p>这张图里有三件事值得说：</p>
+<ol><li><strong>loss 从 17.38 降到 0.2336</strong>，一共降了 74 倍，在第 283 步梯度范数小于 $10^{-12}$ 时停下。</li><li><strong>曲线最后紧紧贴着闭式解底线走</strong>：<code>floor = 0.233551</code>，GD 收敛到的 loss 也是 <code>0.233551</code>，两者只差 $2.78\times10^{-17}$。这说明梯度下降确实被领到了解析最优解上——<strong>这一次自校验，证明了训练过程本身没有写错</strong>。</li><li><strong>纵轴一定要用对数</strong>。如果用线性纵轴，前 20 步就会吃掉整张图，剩下 260 多步全糊在贴着横轴的一条线上；换成对数纵轴后，"指数式衰减"表现为一条笔直的斜线，还能和闭式解底线平行对照，收敛得快不快一眼就能看出来。</li></ol>
 <p><strong>注意1</strong></p>
 <p>值得注意的是，在这里就会碰到训练模型的第一个问题，在py里面的报错是这样的：</p>
-<pre><code class="language-text">RuntimeWarning: overflow encountered in square
+<pre><code>RuntimeWarning: overflow encountered in square
   l=np.mean((predict(w,b,x)-y)**2)
 RuntimeWarning: overflow encountered in multiply
   dw=2*np.mean(((y_hat-y)*x))
 RuntimeWarning: invalid value encountered in scalar subtract
-  w-=lr*dw
-</code></pre>
+  w-=lr*dw</code></pre>
 <p>这表示loss里面存的数超出了float64的上限，原因是虽然我们取的x的最大只有100，但是在loss函数的平方加持下，l存的值很有可能突破float64的上限，因此我们要找一种方法，使得不超过数据上限。</p>
 <p><strong>引入</strong></p>
 <p>在iris数据集中，一个元素（花）存储了5个数据:</p>
-<pre><code class="language-text">5.1,3.5,1.4,0.2,Iris-setosa
+<pre><code>5.1,3.5,1.4,0.2,Iris-setosa
 4.9,3.0,1.4,0.2,Iris-setosa
 4.7,3.2,1.3,0.2,Iris-setosa
-4.6,3.1,1.5,0.2,Iris-setosa
-</code></pre>
-<p>它们的分布有的是五点几，有的是零点几，要是用这个数据直接训练，就一定会导致大的数对训练的影响更大，小的数甚至可能被忽略不计。
-况且，就算是同一个数据，比如1米也有不同的计量方式：100cm，1000mm……要是因为单位而对训练成果造成影响就是很不应该的事。
-所以我们想到的这个方法应该具备如下几个条件：<strong>①能降低数据的大小，但不改变它的分布；②能使不同量纲的数据在改变后有相似的数值③改变后的数据与单位无关</strong>
-这里，就要提到标准化了，在py里面实现是这样的：</p>
-<pre><code class="language-python">x_mean,x_std=x.mean(),x.std()
-x_s=(x-x_mean)/x_std
-</code></pre>
-<p>也就是x_s=（x-x的平均）/x的标准差，这样数据的分布就不由单位决定，并且大的数据在除标准差之后变得小，小的变大，让他们有相似的数值，并且x_s又在0附近分布的优良特性，适合拿来训练。
-所以之前的代码中的x_s就是标准化后的x。</p>
+4.6,3.1,1.5,0.2,Iris-setosa</code></pre>
+<p>它们的分布有的是五点几，有的是零点几，要是用这个数据直接训练，就一定会导致大的数对训练的影响更大，小的数甚至可能被忽略不计。</p>
+<p>况且，就算是同一个数据，比如1米也有不同的计量方式：100cm，1000mm……要是因为单位而对训练成果造成影响就是很不应该的事。</p>
+<p>所以我们想到的这个方法应该具备如下几个条件：<strong>①能降低数据的大小，但不改变它的分布；②能使不同量纲的数据在改变后有相似的数值③改变后的数据与单位无关</strong></p>
+<p>这里，就要提到标准化了，在py里面实现是这样的：</p>
+<pre><code>x_mean,x_std=x.mean(),x.std()
+x_s=(x-x_mean)/x_std</code></pre>
+<p>也就是x_s=（x-x的平均）/x的标准差，这样数据的分布就不由单位决定，并且大的数据在除标准差之后变得小，小的变大，让他们有相似的数值，并且x_s又在0附近分布的优良特性，适合拿来训练。</p>
+<p>所以之前的代码中的x_s就是标准化后的x。</p>
 <p><strong>⑥训练模型与测试集对拍</strong></p>
-<p>在所有准备工作都结束后，我们要把实验模型与测试集对拍
-这里的对拍有两种方式，一种是直接和原函数比，因为这是一元线性回归，我们的标准函数都是确定的，因此可以用np.allclose：</p>
-<pre><code class="language-python">print(np.allclose((w,b),(w_r,b_r),atol=1e-7))
-print(losses[-1])
-</code></pre>
+<p>在所有准备工作都结束后，我们要把实验模型与测试集对拍</p>
+<p>这里的对拍有两种方式，一种是直接和原函数比，因为这是一元线性回归，我们的标准函数都是确定的，因此可以用np.allclose：</p>
+<pre><code>print(np.allclose((w,b),(w_r,b_r),atol=1e-7))
+print(losses[-1])</code></pre>
 <p>当我们把numbers设置成1000时，返回值是：</p>
-<pre><code class="language-text">False #allclose检验泛化能力
-0.2335511837702782 #loss检验训练好坏
-</code></pre>
+<pre><code>False #allclose检验泛化能力
+0.2335511837702782 #loss检验训练好坏</code></pre>
 <p>可以看到这里allclose的返回值是false意味着我们训练出来的模型和实际模型在1e-7的数量级上是不相等的，那么返回false的问题是什么？我们再来看其他几组数据</p>
 <table>
-<thead>
-<tr>
-<th>atol</th>
-<th>allclose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>true</td>
-</tr>
-<tr>
-<td>1e-1</td>
-<td>true</td>
-</tr>
-<tr>
-<td>1e-2</td>
-<td>false</td>
-</tr>
-<tr>
-<td>1e-3</td>
-<td>false</td>
-</tr>
-<tr>
-<td>1e-4</td>
-<td>false</td>
-</tr>
-<tr>
-<td>……</td>
-<td></td>
-</tr>
-<tr>
-<td>也就是说模型数值和真实值只有在0.1的数量级是相等的，大于这个数量级就不相等了,至于数量级对误差的影响，我在这先留个钩子，在第二章会详细讲述。</td>
-<td></td>
-</tr>
-</tbody>
+<tr><th>atol</th><th>allclose</th></tr>
+<tr><td>1</td><td>true</td></tr>
+<tr><td>1e-1</td><td>true</td></tr>
+<tr><td>1e-2</td><td>false</td></tr>
+<tr><td>1e-3</td><td>false</td></tr>
+<tr><td>1e-4</td><td>false</td></tr>
+<tr><td>1e-5</td><td>false</td></tr>
+<tr><td>1e-6</td><td>false</td></tr>
+<tr><td>1e-7</td><td>false</td></tr>
 </table>
-<p><strong>多元线性回归及其导数公式推导</strong>
-对与多元线性回归，它的主体框架和一元是一样的，主要的难点就在于矩阵乘法的形状以及导数的推导，所以我就直接把框架放出了。</p>
-<pre><code class="language-python">import numpy as np
+<p>也就是说模型数值和真实值只有在0.1的数量级是相等的，再往下就都不相等了。</p>
+<p><strong>那这个 false 是不是说明代码写错了？</strong> 不是，算一下就明白了。这次训练学出来的参数和真值差了 $|w-w_r|=0.0115$、$|b-b_r|=0.0154$，而 <code>np.allclose(a,b,atol)</code> 的判据是</p>
+<p>$$|a-b|\le \text{atol}+\text{rtol}\cdot|b|$$</p>
+<p>（<code>rtol</code> 默认 $10^{-5}$）。代入 $b_r=4$，门槛是 $0.0154+4\times10^{-5}\approx0.0154$，所以 <code>atol</code> 得给到 $10^{-1}$ 才过得去，给 $10^{-2}$ 就已经差那么一点点，$10^{-7}$ 更是必然 false。<strong>表里 true/false 的分界线卡在 $0.0154$ 上，它就是这次训练真实存在的偏差</strong>，不是我随便挑的阈值。</p>
+<p>那这 $0.0154$ 又是从哪来的？答案是<strong>噪声</strong>。$y$ 里加了 $\sigma=0.5$ 的高斯噪声，最小二乘解自己就会偏：截距估计的标准差是 $\sigma/\sqrt{n}=0.5/\sqrt{1000}\approx0.0158$，和实测的 $0.0154$ 是同一个量级。<strong>所以 $b\neq b_r$ 不是 bug，而是"在这批含噪数据上，最优的 $b$ 本来就不是 $b_r$"</strong> —— 梯度下降到达的是数据的最优解，不是生成数据的那个真值，两者只有在数据量趋于无穷时才重合。</p>
+<p>至于数量级对误差的影响，我在这先留个钩子，在第二章会详细讲述。</p>
+<p><strong>数据量对泛化的影响</strong></p>
+<p>顺着上面这个问题再往下问一句：既然参数对不上是噪声导致的，那数据多一点，是不是就贴得更近？我把 <code>numbers</code> 取 $10,20,50,100,1000,10000,50000,100000$ 各训练一遍，把训练末 loss 和测试集 loss 都记下来：</p>
+<table>
+<tr><th>数据量</th><th>收敛步数</th><th>训练末 loss</th><th>测试集 loss</th><th>两者差距</th></tr>
+<tr><td>10</td><td>270</td><td>0.094</td><td>0.294</td><td>0.200</td></tr>
+<tr><td>20</td><td>282</td><td>0.179</td><td>0.326</td><td>0.147</td></tr>
+<tr><td>50</td><td>277</td><td>0.171</td><td>0.227</td><td>0.056</td></tr>
+<tr><td>100</td><td>281</td><td>0.260</td><td>0.303</td><td>0.043</td></tr>
+<tr><td>1000</td><td>283</td><td>0.234</td><td>0.205</td><td>-0.029</td></tr>
+<tr><td>10000</td><td>282</td><td>0.249</td><td>0.237</td><td>-0.012</td></tr>
+<tr><td>50000</td><td>281</td><td>0.251</td><td>0.261</td><td>0.010</td></tr>
+<tr><td>100000</td><td>280</td><td>0.249</td><td>0.241</td><td>-0.008</td></tr>
+</table>
+<p>先看第一行：<strong>数据量只有 10 的时候，训练 loss 是 0.094，测试 loss 却是 0.294，差了 3 倍。</strong> 这就是过拟合最朴素的样子——10 个点怎么弯都能把训练误差压下去，一换数据集就露馅。随着数据量从 10 涨到 100000，两者的差距从 0.200 一路收到 0.01 上下，最后两条 loss 都停在 <strong>0.25 附近</strong>。</p>
+<p>0.25 不是巧合，它正是我们加进去的噪声方差 $\sigma^2=0.5^2=0.25$。也就是说：<strong>数据量足够大以后，模型把 $y$ 里"可学的部分"全学完了，剩下的误差只是噪声，再怎么加数据也降不下去。</strong> 泛化误差的下限由噪声决定，数据量做的事只是让我们逼近这个下限。</p>
+<p><strong>这里还有一个我自己踩到的实验设计坑：</strong> 测试集 loss 在不同数据量之间会上下跳（0.205 到 0.326），这不是模型在变差，而是因为每一轮测试集都是<strong>重新生成</strong>的 100 个点 —— 测试集自己就带着 $\pm0.035$ 的抽样波动，比数据量带来的真实差异（约 0.025）还大。想看干净的趋势，测试集必须固定住、只生成一次，否则你测到的是测试集的运气，不是模型的泛化能力。</p>
+<p><strong>多元线性回归及其导数公式推导</strong></p>
+<p>对与多元线性回归，它的主体框架和一元是一样的，主要的难点就在于矩阵乘法的形状以及导数的推导，所以我就直接把框架放出了。</p>
+<pre><code>import numpy as np
 
 data=[]
 
 numbers=1000
-&quot;&quot;&quot;数据集获取&quot;&quot;&quot;
+"""数据集获取"""
 np.random.seed(0)
 x=np.random.uniform(0,100,(numbers,100)) #有一千个方程，每个方程的参数有100个
 bios=np.random.randn(numbers,)*0.5
 theta_r=np.random.randint(0,5,(99,)) #假设有100个参数
 theta_r=np.r_[np.ones(1,),theta_r] #让其中一个参数充当b
 
-&quot;&quot;&quot;标准化&quot;&quot;&quot;
+"""标准化"""
 x_mean,x_std=x.mean(),x.std()
 x_s=(x-x_mean)/x_std
 
-&quot;&quot;&quot;训练集&quot;&quot;&quot;
+"""训练集"""
 y=x_s@theta_r+bios
 
-&quot;&quot;&quot;预测&quot;&quot;&quot;
+"""预测"""
 def predict(theta,x_s):
     return x_s@theta
 
-&quot;&quot;&quot;损失函数&quot;&quot;&quot;
+"""损失函数"""
 def loss(theta,x_s,y):
     return (1/numbers)*((predict(theta,x_s)-y)**2).sum()
 
-&quot;&quot;&quot;梯度下降&quot;&quot;&quot;
+"""梯度下降"""
 def grad(theta,x_s,y):
     y_hat=predict(theta,x_s)
     dtheta=(2/numbers)*x_s.T@(y_hat-y)
     return dtheta
 
-&quot;&quot;&quot;训练过程&quot;&quot;&quot;
+"""训练过程"""
 losses=[]
 lr=0.05
 theta=np.zeros(100,)
@@ -230,15 +224,14 @@ for i in range(1000):
         data.append(i)
         break
 
-&quot;&quot;&quot;对拍&quot;&quot;&quot;
+"""对拍"""
 print(np.allclose(theta_r,theta,atol=1e-1))
-print(losses[-1])
-</code></pre>
+print(losses[-1])</code></pre>
 <p>这里最难理解的就是梯度下降公式，我们可以把它分成两部分看，一部分是形状，另一部分是数值。</p>
-<p>先看形状：我们给的x-&gt;n×100 theta-&gt;100×1，因此，想要得到y-&gt;n×1,就必须让x@theta(@表示矩阵乘法，中间的维度相消，两边的维度拼在一起)，这是训练数据的获取。
-之后我们的损失函数是$\mathrm{loss}=\dfrac{1}{n}\sum(\hat y-y)^2$，这里就是对不同预测的y与真实的y相减平方求平均在做和，做和的原因是我们想要损失函数是一个数，这样在面对不同参数量的模型时，同一个损失函数的分析方法就有更好的泛用性。
-在此，我们对损失函数求导，先看我们要的dtheta的形状：100×1，对loss求导，我们用链式法则，dloss/dpre=(2/n)*(pre-real)它的形状和y的形状相同：n×1，接下来我们对pre求theta的偏导，在矩阵中对另一个矩阵求偏导，这可能很难理解，但我们这样想把theta看作 (w1,w2,w3,w4,……)对每一个wn求导时，其余w可看作常数，因此这本质上就是多个一元线性回归中对w求导，再把他们组成成一个向量。而我们在一元线性回归中对w求导的公式是这样的y=x×w+b dy/dw=x,因为每一个wn都对应着那一列的xni即
-把 $\hat y$ 摊开成方程组就清楚了：</p>
+<p>先看形状：我们给的x-&gt;n×100 theta-&gt;100×1，因此，想要得到y-&gt;n×1,就必须让x@theta(@表示矩阵乘法，中间的维度相消，两边的维度拼在一起)，这是训练数据的获取。</p>
+<p>之后我们的损失函数是$\mathrm{loss}=\dfrac{1}{n}\sum(\hat y-y)^2$，这里就是对不同预测的y与真实的y相减平方求平均在做和，做和的原因是我们想要损失函数是一个数，这样在面对不同参数量的模型时，同一个损失函数的分析方法就有更好的泛用性。</p>
+<p>在此，我们对损失函数求导，先看我们要的dtheta的形状：100×1，对loss求导，我们用链式法则，dloss/dpre=(2/n)*(pre-real)它的形状和y的形状相同：n×1，接下来我们对pre求theta的偏导，在矩阵中对另一个矩阵求偏导，这可能很难理解，但我们这样想把theta看作 (w1,w2,w3,w4,……)对每一个wn求导时，其余w可看作常数，因此这本质上就是多个一元线性回归中对w求导，再把他们组成成一个向量。而我们在一元线性回归中对w求导的公式是这样的y=x×w+b dy/dw=x,因为每一个wn都对应着那一列的xni即</p>
+<p>把 $\hat y$ 摊开成方程组就清楚了：</p>
 <p>$$\hat y_i=\sum_{j=0}^{p}x_{ij}\theta_j=x_{i0}\theta_0+x_{i1}\theta_1+\cdots+x_{ip}\theta_p,\qquad i=1,2,\dots,n$$</p>
 <p>固定一个 $j$，对 $\theta_j$ 求偏导（其余 $\theta$ 全部当常数），$\theta_j$ 在每一项里只乘了一个常数系数：</p>
 <p>$$\frac{\partial \hat y_i}{\partial \theta_j}=x_{ij}$$</p>
@@ -276,19 +269,19 @@ $$</p>
 =\underbrace{\frac{\partial \hat y}{\partial \theta}}_{(p+1)\times n}
 \ \underbrace{\frac{\partial J}{\partial \hat y}}_{n\times1}
 =\frac{2}{n}X^{\top}\left(\hat y-y\right)\in\mathbb{R}^{(p+1)\times1}
-$$
-所以对pre求theta的偏导数值上就是每一个w上的x组成的矩阵即((x11,x21,x31,……),(x21,x22,x23,……)，……)，也就是x的转置-&gt;x.T，它的形状是100×n。
-在最后我们想要的dtheta的形状是100×1，这里我们有两个乘法因子，一个是 dloss/dpre-&gt;n×1 另一个是 dpre/dtheta 它的形状是 100×n，要形成100×1的形状，矩阵乘法的规则也呼之欲出了：</p>
+$$</p>
+<p>所以对pre求theta的偏导数值上就是每一个w上的x组成的矩阵即((x11,x21,x31,……),(x21,x22,x23,……)，……)，也就是x的转置-&gt;x.T，它的形状是100×n。</p>
+<p>在最后我们想要的dtheta的形状是100×1，这里我们有两个乘法因子，一个是 dloss/dpre-&gt;n×1 另一个是 dpre/dtheta 它的形状是 100×n，要形成100×1的形状，矩阵乘法的规则也呼之欲出了：</p>
 <p>$$\frac{\partial J}{\partial \theta}=\frac{\partial \hat y}{\partial \theta}\cdot\frac{\partial J}{\partial \hat y}$$</p>
 <p>这就是多元线性回归梯度下降公式的所有秘密。得到grad函数后的过程和一元线性回归没有区别，我就不多赘述。</p>
-<hr />
+<hr>
 <h2>差分与直接求导の区别</h2>
 <p>那我们在推导公式求导时花了这么大的功夫究竟是为了什么？为什么不能用直接差分的方法 $f'(x)=\dfrac{f(x+h)-f(x-h)}{2h}$，这种做法简单直接，况且还具有泛用性，我们不用每次遇到一个新模型就急头白脸地去推导求导公式，而是只要有模型，我们就能求导，所以为什么不这样呢？</p>
 <p>接下来我将从效率、误差、以及如今求导的实现方式一一讲起：</p>
 <h3>效率差异</h3>
-<p>我们就以一元线性回归举例，看看两者代码时间复杂度有什么差异。
-这是公式法：</p>
-<pre><code class="language-python">&quot;&quot;&quot;梯度下降（公式版）&quot;&quot;&quot;
+<p>我们就以一元线性回归举例，看看两者代码时间复杂度有什么差异。</p>
+<p>这是公式法：</p>
+<pre><code>"""梯度下降（公式版）"""
 import time
 def grads(w,x_s,b,y):
     y_hat=predict(w,x_s,b)
@@ -301,10 +294,9 @@ b=0
 t0 = time.perf_counter()
 for _ in range(10000):
     grads(x_s,w,b,y)
-t1 = time.perf_counter()
-</code></pre>
+t1 = time.perf_counter()</code></pre>
 <p>这是差分法：</p>
-<pre><code class="language-python">&quot;&quot;&quot;梯度下降（差分版）&quot;&quot;&quot;
+<pre><code>"""梯度下降（差分版）"""
 def gradsc(w,x_s,b,y):
     h=np.random.uniform(0,1e-3)
     dw=(loss(w+h,x_s,b,y)-loss(w-h,x_s,b,y))/(2*h)
@@ -317,51 +309,31 @@ t0 = time.perf_counter()
 for _ in range(10000):
     gradsc(x_s,w,b,y)
 t1 = time.perf_counter()
-print((t1-t0)/100)
-</code></pre>
+print((t1-t0)/100)</code></pre>
 <p>它们用时差异是这样的：(之后我又测了几组数据，把主要的写下来)</p>
 <table>
-<thead>
-<tr>
-<th>计算次数</th>
-<th>公式</th>
-<th>差分</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>100</td>
-<td>0.01s</td>
-<td>0.03s</td>
-</tr>
-<tr>
-<td>1000</td>
-<td>0.02s</td>
-<td>0.037s</td>
-</tr>
-<tr>
-<td>5000</td>
-<td>0.063s</td>
-<td>0.114s</td>
-</tr>
-<tr>
-<td>10000</td>
-<td>0.128s</td>
-<td>0.233s</td>
-</tr>
-<tr>
-<td>可见无论是多少计算次数下，公式求导消耗的时间都是差分的一半，公式求导有明显的性能优势，但这是为什么呢？有理论依据吗？</td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
+<tr><th>计算次数</th><th>公式</th><th>差分</th><th>倍数</th></tr>
+<tr><td>100</td><td>0.001s</td><td>0.003s</td><td>3.0</td></tr>
+<tr><td>1000</td><td>0.020s</td><td>0.037s</td><td>1.9</td></tr>
+<tr><td>2000</td><td>0.031s</td><td>0.055s</td><td>1.8</td></tr>
+<tr><td>3000</td><td>0.034s</td><td>0.070s</td><td>2.1</td></tr>
+<tr><td>4000</td><td>0.051s</td><td>0.089s</td><td>1.8</td></tr>
+<tr><td>5000</td><td>0.063s</td><td>0.114s</td><td>1.8</td></tr>
+<tr><td>6000</td><td>0.072s</td><td>0.139s</td><td>1.9</td></tr>
+<tr><td>7000</td><td>0.084s</td><td>0.170s</td><td>2.0</td></tr>
+<tr><td>8000</td><td>0.097s</td><td>0.191s</td><td>2.0</td></tr>
+<tr><td>9000</td><td>0.111s</td><td>0.211s</td><td>1.9</td></tr>
+<tr><td>10000</td><td>0.128s</td><td>0.233s</td><td>1.8</td></tr>
+<tr><td>10900</td><td>0.135s</td><td>0.266s</td><td>2.0</td></tr>
 </table>
+<p>（完整数据在 <code>time consume.csv</code> 里，从 100 到 10900 每 100 次一组。第一行那个 3.0 是因为 0.001s 已经卡在计时器精度上了，样本太小，不能算数。）</p>
+<p>可见无论是多少计算次数下，公式求导消耗的时间都是差分的一半左右——<strong>两者都是随次数线性增长，只是斜率差了一个约 2 倍的常数因子</strong>。这个 2 倍在整个 100~10900 的区间里稳定得不像偶然，说明它是结构性的，不是噪声。那这是为什么呢？有理论依据吗？</p>
 <p>我们先看公式版，在这里$\hat y$也就是预测值被计算了一次，求导被计算了两次，求导的复杂度相当于在已知预测值的情况下计算了一次loss，大约进行了3次计算；而差分版是计算了两次loss，每一次loss都要<strong>单独计算预测值</strong>，况且同样要计算四次loss，相当于计算了6次。也就是说，公式法因为<strong>只计算一次预测值</strong>以至于相比较差分法有明显性能优势。</p>
 <p>在一般训练大模型时，因为参数量巨大，一次反向传播要计算求导的数量级就是10⁹～10¹²，如果还是用差分法，消耗10⁹～10¹²倍的时间才能有一样的性能，这是得不偿失的。你也不想你的蓝色大肥鱼被别人超吧。</p>
 <h3>误差分析</h3>
-<p>我们看一下这两种求导方法是否会造成误差，先看公式法，因为是直接按照公式求导，最有可能的误差也只是浮点数不能完全代表小数造成的误差。
-我们再看差分法，先用数据说话，用正确方法（公式）和差分法比较同一组数据收敛到同一值所需要的时间，python里面的实现是这样的：</p>
-<pre><code class="language-python">&quot;&quot;&quot;训练过程&quot;&quot;&quot;
+<p>我们看一下这两种求导方法是否会造成误差，先看公式法，因为是直接按照公式求导，最有可能的误差也只是浮点数不能完全代表小数造成的误差。</p>
+<p>我们再看差分法，先用数据说话，用正确方法（公式）和差分法比较同一组数据收敛到同一值所需要的时间，python里面的实现是这样的：</p>
+<pre><code>"""训练过程"""
 losses1=[]
 lr=0.05
 w=0
@@ -391,41 +363,21 @@ for i in range(1000):
     if np.linalg.norm([dw,db])&lt;1e-9:
         t2=i
         break
-print(t1,f&quot;{losses1[-1]:.3f}&quot;,t2,f&quot;{losses2[-1]:.3f}&quot;)
-</code></pre>
+print(t1,f"{losses1[-1]:.3f}",t2,f"{losses2[-1]:.3f}")</code></pre>
 <p>最后打印出来是这样的：</p>
 <table>
-<thead>
-<tr>
-<th>公式</th>
-<th>公式结束时的loss</th>
-<th>差分</th>
-<th>差分结束时的loss</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>217</td>
-<td>0.234</td>
-<td>217</td>
-<td>0.234</td>
-</tr>
-<tr>
-<td>结果非常amazing啊，这两个的收敛节奏居然是一样的，甚至损失函数都是一样的，那是不是差分法就没有误差呢？这需要数学上的分析。</td>
-<td></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
+<tr><th>公式</th><th>公式结束时的loss</th><th>差分</th><th>差分结束时的loss</th></tr>
+<tr><td>217</td><td>0.234</td><td>217</td><td>0.234</td></tr>
 </table>
+<p>结果非常amazing啊，这两个的收敛节奏居然是一样的，甚至损失函数都是一样的，那是不是差分法就没有误差呢？这需要数学上的分析。</p>
 <p>我们直接看差分的公式，为了简化复杂度，我们就只对w分析（因为b和w地位是对等的，在多元线性回归中能看出来）：</p>
 <p>$$dw=\frac{\frac{1}{n}\Big(\big((w+h)x_s+b-y\big)^2-\big((w-h)x_s+b-y\big)^2\Big)}{2h}$$</p>
 <p>把 $1/n$ 提出来再把平方展开并化简（这里建议手算化简）有</p>
 <p>$$dw=\frac{\frac{1}{n}\cdot 4x_sh(wx_s+b-y)}{2h}$$</p>
 <p>继续化简有</p>
 <p>$$dw=\frac{2}{n}x_s(\hat y-y)=\frac{\partial L}{\partial w}$$</p>
-<p>因此，不是每个一元线性回归差分法和公式法都没有误差，而是我们选择的MSE恰好让差分法和公式法没有了误差。
-那么有没有什么方法能让我们一眼就能知道这二者有没有误差呢？</p>
+<p>因此，不是每个一元线性回归差分法和公式法都没有误差，而是我们选择的MSE恰好让差分法和公式法没有了误差。</p>
+<p>那么有没有什么方法能让我们一眼就能知道这二者有没有误差呢？</p>
 <p>有的兄弟，有的。</p>
 <p>这就是泰勒展开，帮助我们分析差分的误差。</p>
 <p>$$f(x+h)=f+f'h+\frac{f''h^2}{2}+\frac{f'''h^3}{6}+\cdots$$</p>
@@ -441,7 +393,7 @@ print(t1,f&quot;{losses1[-1]:.3f}&quot;,t2,f&quot;{losses2[-1]:.3f}&quot;)
 <p>$$H'(h)=\frac{|f'''|}{3}h-\frac{\varepsilon|f|}{h^2}=0\;\Longrightarrow\;h^*=\left(\frac{3\varepsilon|f|}{|f'''|}\right)^{1/3}$$</p>
 <p>代入我们这组数（$|f'''|=0.3826$、$|f|=79.99$）算出来 $h^*=5.18\times10^{-5}$，也就是说 $h$ 的数量级大约在 $10^{-5}$ 的时候取到极值。</p>
 <p>那么事实是否是真的呢，我们用python实现一下(为了简洁，我们就只讨论w了)。</p>
-<pre><code class="language-python">&quot;&quot;&quot;损失函数（三次）&quot;&quot;&quot;
+<pre><code>"""损失函数（三次）"""
 def lossthree(w,x_s,b,y):
     return (1/numbers)*((predict(w,x_s,b)-y)**3).sum()
 
@@ -458,12 +410,11 @@ for h in hs:
     dn=(lossthree(w+h,x_s,b,y)-lossthree(w-h,x_s,b,y))/(2*h)
     dw=gradthree(w,x_s,b,y)
     errs.append(abs(dn-dw)/abs(dw))
-errs=np.array(errs)
-</code></pre>
+errs=np.array(errs)</code></pre>
 <p>用这种算法画出的图是这样的：</p>
-<p><img src="%E5%B7%AE%E5%88%86%E6%B1%82%E5%AF%BCU%E5%BD%A2%E8%B0%B7.png" alt="差分求导的 U 形谷" /></p>
-<p>结果非常amazing啊，和我们的理论推导一模一样：左边因为 $h$ 大、截断项 $\dfrac{|f'''|}{6}h^2$ 大，误差大；右边因为 $h$ 小、舍入项 $\dfrac{\varepsilon|f|}{h}$ 大，误差大，而正好在 $h\approx10^{-4}\sim10^{-5}$ 的时候取到 U 形谷的谷底。
-也就是说以后无论什么损失函数，我们都有办法通过泰勒展开知道直接差分的误差大约在多少，只是分析的复杂度大小罢了。</p>
+<p><img alt="差分求导的 U 形谷" src="差分求导U形谷.png"></p>
+<p>结果非常amazing啊，和我们的理论推导一模一样：左边因为 $h$ 大、截断项 $\dfrac{|f'''|}{6}h^2$ 大，误差大；右边因为 $h$ 小、舍入项 $\dfrac{\varepsilon|f|}{h}$ 大，误差大，而正好在 $h\approx10^{-4}\sim10^{-5}$ 的时候取到 U 形谷的谷底。</p>
+<p>也就是说以后无论什么损失函数，我们都有办法通过泰勒展开知道直接差分的误差大约在多少，只是分析的复杂度大小罢了。</p>
 <p>但是值得注意的是，我们这里能<strong>精确给出 $h^*$ 的取值</strong>，却给不出 $H_{\min}$ 的精确值 —— 因为 $f'''$ 在不同的 $w$ 处取值不同，而且舍入项的真实振幅还取决于浮点实现，所以我们只能给出量级：</p>
 <p>$$H_{\min}\approx1.89\left(\frac{|f'''|}{6}\right)^{1/3}\left(\varepsilon|f|\right)^{2/3}$$</p>
 <p>换句话说：<strong>谷底在哪能算准，谷底有多深只能算个量级</strong>。</p>
@@ -487,10 +438,10 @@ errs=np.array(errs)
 <p><strong>形状不同怎么办</strong></p>
 <p>这是反向传播遇到的第二个问题，我们同样可以借助线性回归的经验来类比，loss函数最终输出的就是一个值，但无论多元线性回归还是一元线性回归，它都有复数个参数量，我们是如何解决这个问题的？就是让loss函数对不同参数分别求偏导，那么不就把loss函数展开了。同理当我们遇到值的形状小于函数参数的形状时，我们可以分别求偏导把值给展开。当我们遇到值的形状大于函数参数的形状时，我们可以借助knn的经验，把值的维度压缩成函数参数的形状。所以这就是autograd的主要原理了。</p>
 <p>在python中的简单实现是这样的，由于pytorch中的autograd是以cpp为基础优化过算法的，这里我就给出一个玩具形式：</p>
-<pre><code class="language-python">import numpy as np
+<pre><code>import numpy as np
 
 def _match(g, shape):
-    &quot;&quot;&quot;梯度比目标形状“胖”，说明前向被广播过，把多出来的维度加回去&quot;&quot;&quot;
+    """梯度比目标形状“胖”，说明前向被广播过，把多出来的维度加回去"""
     g=np.asarray(g, dtype=float)
     while g.ndim &gt; len(shape):
         g=g.sum(axis=0)
@@ -500,7 +451,7 @@ def _match(g, shape):
     return g
 
 class Var:
-    &quot;&quot;&quot;会自动记录计算过程的标量/数组&quot;&quot;&quot;
+    """会自动记录计算过程的标量/数组"""
     __array_priority__=1000
 
     def __init__(self,data,parents=(),gradfns=()):
@@ -536,7 +487,7 @@ class Var:
                    (lambda g:np.full_like(self.data,g/self.data.size,dtype=float),))
 
     def backward(self):
-        &quot;&quot;&quot;从当前节点出发反向遍历一遍，把所有 .grad 填上（这就是 loss.backward()）&quot;&quot;&quot;
+        """从当前节点出发反向遍历一遍，把所有 .grad 填上（这就是 loss.backward()）"""
         topo,seen,stack=[],set(),[(self, False)]
         while stack:
             node, done=stack.pop()
@@ -552,12 +503,11 @@ class Var:
         for node in reversed(topo):
             for parent,fn in zip(node.parents,node.gradfns):
                 g=fn(node.grad)
-                parent.grad=g if parent.grad is None else parent.grad+g
-</code></pre>
+                parent.grad=g if parent.grad is None else parent.grad+g</code></pre>
 <p>至于这里面的工程细节其实我也没有完全想明白，就交给之后手撕transformer的时候吧。</p>
 <h2>结 这不是结束，甚至不是结束的开始，这只是开始的结束</h2>
 <p>看到这，肯定有人还是想问，为什么要学这些数理知识，我只要知道模型的用法，会用就行了吗？之前我从纯粹推导的角度回答了这个问题，现在我想用哲学点的语言回答：我们是站在前人的肩膀上的，人工智能最初的先行者也是向我们刚刚那样一点一点从零搭建起这个框架的，或许他们那时也会想，为什么不用直接差分，为什么不都用公式推导。他们最后一点点摸着石头过河，才优化迭代出现在的pytorch、tensorflow。我们研究这个的目的，就是进一步推进优化前人的智慧。万一，我说万一我们某一次的奇思妙想就成为了推开agi大门的钥匙了？</p>
 <p>“这不是结束，甚至不是结束的开始，这只是开始的结束”，这句话在互联网上常常用来指代漫无止尽的困苦，就像有人拿它来指代高中。但我想换个角度思考，这句话不也是意味着我们还充满生命，依旧能面对无止尽的困难，又或者，这无止尽的研究本就是乐趣的一部分。所以，我觉得AI研究用这句话来描述是相当合适的，因为AI这个领域——</p>
 <p><strong>永远年轻，永远热泪盈眶。</strong></p>
-
-</div></body></html>
+</div>
+</body></html>

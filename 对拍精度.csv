@@ -1,0 +1,9 @@
+﻿数量级,是否对拍成功
+1,True
+0.1,True
+0.01,False
+0.001,False
+0.0001,False
+1e-05,False
+1e-06,False
+1e-07,False
