@@ -4,21 +4,17 @@ import csv
 import time
 
 class Data:
-    def __init__(self,times,number,w_r,b_r,w,b,loss_end,val):
+    def __init__(self,times,number,loss_end,val,diff):
         self.times=times
         self.number=number
-        self.w_r=w_r
-        self.b_r=b_r
-        self.w=w
-        self.b=b
         self.loss_end=loss_end
         self.val=val
+        self.diff=diff
 
     def to_row(self):
         return [self.times, self.number,
-                f"{self.w_r:.3f}", f"{self.b_r:.3f}",
-                f"{self.w:.3f}", f"{self.b:.3f}",
-                f"{self.loss_end:.3f}", f"{self.val:.3e}"]
+                f"{self.loss_end:.3f}", f"{self.val:.3e}",
+                f"{self.diff:.3f}"]
 
 class Atl:
     def __init__(self,i,ok):
@@ -46,11 +42,11 @@ def predict(w,x_s,b):
 
 """损失函数(MSE)"""
 def loss(w,x_s,b,y):
-    return (1/numbers)*((predict(w,x_s,b)-y)**2).sum()
+    return ((predict(w,x_s,b)-y)**2).mean()
 
 """损失函数(MAE)"""
 def lossc(w,x_s,b,y):
-    return (1/numbers)*abs(predict(w,x_s,b)-y).sum()
+    return abs(predict(w,x_s,b)-y).mean()
 
 """梯度下降（公式版）"""
 def grads(w,x_s,b,y):
@@ -357,12 +353,12 @@ while order!=-1:
                 xte_s = (xte - x_mean) / x_std
                 yte = w_r * xte_s + b_r + bios
                 val = np.mean(loss(w, xte_s, b, yte))
-                data.append(Data(times, numbers, w_r, b_r, w, b, losses[-1], val))
+                data.append(Data(times, numbers, losses[-1], val, val-losses[-1]))
 
             """写入csv"""
-            with open("simple linear regression.csv", 'w', encoding="UTF-8-sig", newline='') as f:
+            with open("泛化能力比较.csv", 'w', encoding="UTF-8-sig", newline='') as f:
                 w = csv.writer(f)
-                w.writerow(["times", "numbers", "w_real", "b_real", "w", "b", "loss_end", "value"])
+                w.writerow(["收敛步数","数据量","训练末loss","测试集loss","两者差距"])
                 w.writerows(line.to_row() for line in data)
 
 
